@@ -23,6 +23,33 @@
 // button object instance (defined in OpenFIREcommon.h/OpenFIREprefs.h)
 LightgunButtons FW_Common::buttons(lgbData, ButtonCount);
 
+// Rotates raw IR points per FW_Common::camRotation, refitting the result back
+// into the sensor's native CamResX x CamResY (non-square) coordinate space
+// so downstream square/diamond solving is unaffected by the rotation.
+static void RotateCamPoints(const int* rawX, const int* rawY, int (&x)[4], int (&y)[4])
+{
+    for(int i = 0; i < 4; ++i) {
+        switch(FW_Common::camRotation) {
+            case 90:
+                x[i] = map(rawY[i], 0, CamMaxY, 0, CamMaxX);
+                y[i] = map(CamMaxX - rawX[i], 0, CamMaxX, 0, CamMaxY);
+                break;
+            case 180:
+                x[i] = CamMaxX - rawX[i];
+                y[i] = CamMaxY - rawY[i];
+                break;
+            case 270:
+                x[i] = map(CamMaxY - rawY[i], 0, CamMaxY, 0, CamMaxX);
+                y[i] = map(rawX[i], 0, CamMaxX, 0, CamMaxY);
+                break;
+            default:
+                x[i] = rawX[i];
+                y[i] = rawY[i];
+                break;
+        }
+    }
+}
+
 void FW_Common::FeedbackSet()
 {
     #ifdef USES_RUMBLE
@@ -650,9 +677,12 @@ void FW_Common::GetPosition()
     if(dfrIRPos != nullptr) {
         int error = dfrIRPos->basicAtomic(DFRobotIRPositionEx::Retry_2);
         if(error == DFRobotIRPositionEx::Error_Success) {
+            int rotX[4], rotY[4];
+            RotateCamPoints(dfrIRPos->xPositions(), dfrIRPos->yPositions(), rotX, rotY);
+
             // if diamond layout, or square
             if(OF_Prefs::profiles[OF_Prefs::currentProfile].irLayout) {
-                OpenFIREdiamond.begin(dfrIRPos->xPositions(), dfrIRPos->yPositions(), dfrIRPos->seen());
+                OpenFIREdiamond.begin(rotX, rotY, dfrIRPos->seen());
                 OpenFIREper.warp(OpenFIREdiamond.X(0), OpenFIREdiamond.Y(0),
                                 OpenFIREdiamond.X(1), OpenFIREdiamond.Y(1),
                                 OpenFIREdiamond.X(2), OpenFIREdiamond.Y(2),
@@ -661,7 +691,7 @@ void FW_Common::GetPosition()
                                 res_y / 2, res_x / 2,
                                 res_y, res_x, res_y / 2);
             } else {
-                OpenFIREsquare.begin(dfrIRPos->xPositions(), dfrIRPos->yPositions(), dfrIRPos->seen());
+                OpenFIREsquare.begin(rotX, rotY, dfrIRPos->seen());
                 OpenFIREper.warp(OpenFIREsquare.X(0), OpenFIREsquare.Y(0),
                                 OpenFIREsquare.X(1), OpenFIREsquare.Y(1),
                                 OpenFIREsquare.X(2), OpenFIREsquare.Y(2),

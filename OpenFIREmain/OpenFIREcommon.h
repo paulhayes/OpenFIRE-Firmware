@@ -129,6 +129,12 @@ public:
     // flag to warn docked server if camera is not working currently
     static inline bool camNotAvailable = false;
 
+    // Raw IR camera mounting rotation, clockwise, in degrees.
+    // Set this to match however many degrees CW the camera module is physically
+    // rotated from its normal/intended mounting orientation.
+    // Valid values ONLY: 0, 90, 180, 270.
+    static inline int camRotation = 180;
+
     static inline uint32_t camWarningTimestamp = 0;
     #define CAM_WARNING_INTERVAL 3000
 
